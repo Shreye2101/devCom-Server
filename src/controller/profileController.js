@@ -67,11 +67,14 @@ const edit = async (req, res) => {
     };
 
     const updatedUser = await User.findByIdAndUpdate(
-      user._id,
-      allowedFeildsToEdit,
-      { runValidators: true },
-      { returnDocument: "after" }
-    );
+  user._id,
+  allowedFeildsToEdit,
+  {
+    new: true, // ✅ This returns the updated document
+    runValidators: true,
+  }
+);
+
 
     res.status(200).json({
       isSuccess: true,

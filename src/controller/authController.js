@@ -29,7 +29,7 @@ const sendOtp = async (req, res) => {
     const { emailID } = req.body;
 
     if (!emailID) {
-      res
+    res 
         .status(400)
         .send({ isSuccess: false, message: "email id is required" });
     }
@@ -151,7 +151,7 @@ const login = async (req, res) => {
     if (!isPasswordMatched) {
       return res.status(400).json({
         isSuccess: false,
-        message: `${password} is incorrect password `,
+        message: `incorrect password `,
       });
     }
 
