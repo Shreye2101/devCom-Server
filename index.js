@@ -1,91 +1,94 @@
-//copy of index.js running code
-
 const express = require("express");
 const connectDB = require("./src/config/db");
 const cookieParser = require("cookie-parser");
-const http = require("http"); // For creating the HTTP server
-const { Server } = require("socket.io"); // Import Socket.IO
+const http = require("http");
+const { Server } = require("socket.io");
 const cors = require("cors");
-const insertRoute = require("./src/routes/insertRoute");
-
-//const serverless = require("serverless-http");
+require("dotenv").config(); // ✅ Load .env early
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: [
-      "http://localhost:3000",
-      "http://localhost:5173",
-      "https://mydevtinder.netlify.app",
-    ],
-    methods: ["GET", "POST"],
-  },
-});
-app.set("io", io);
-app.use(express.json());
-app.use(cookieParser());
+
+// ✅ Allow multiple origins from .env
+const allowedOrigins = process.env.CLIENT_URLS
+  ? process.env.CLIENT_URLS.split(",")
+  : [];
+
+// ✅ Express CORS
 app.use(
   cors({
-    origin: ["http://localhost:5173", "https://mydevtinder.netlify.app"],
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     methods: ["GET", "POST", "PUT", "PATCH"],
     credentials: true,
   })
 );
 
-//all Routes
+// ✅ Socket.IO setup with same CORS
+const io = new Server(server, {
+  cors: {
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by Socket.IO CORS"));
+      }
+    },
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+});
 
-app.use("/", insertRoute)
+app.set("io", io);
+app.use(express.json());
+app.use(cookieParser());
+
+// ✅ Routes
 app.use("/auth", require("./src/routes/authRoutes"));
 app.use("/profile", require("./src/routes/profileRoutes"));
 app.use("/request", require("./src/routes/connectionRoutes"));
 app.use("/user", require("./src/routes/userRotutes"));
 app.use("/message", require("./src/routes/messageRoute"));
 
-//first connect to db then start listening to api calls
+// ✅ Connect to DB and start server
 connectDB()
   .then(() => {
     console.log("Database connection established");
-    const PORT = process.env.PORT || 5000;
-     server.listen(PORT, () => {
-     console.log(`Server running on port ${PORT}`);
-});
-
+    server.listen(5000, () => {
+      console.log("Server running on port 5000");
+    });
   })
   .catch((err) => {
-    console.log("database connection error", err);
+    console.log("Database connection error:", err);
   });
 
-// Socket.IO configuration
+// ✅ Socket.IO Events
 io.on("connection", (socket) => {
-  console.log("A user connected:", socket.id);
+  console.log("User connected:", socket.id);
 
-  // Join room
   socket.on("joinRoom", (roomID) => {
     socket.join(roomID);
-    console.log(`User ${socket.id} joined room: ${roomID}`);
+    console.log(`User ${socket.id} joined room ${roomID}`);
   });
 
-  // Listen for chat messages and emit only to the room
   socket.on("sendMessage", (message) => {
-    // console.log("Message received:", message);
     const roomID = message.conversationID;
-
     if (roomID) {
-      // Emit message only to users in the same room
       io.to(roomID).emit("receiveMessage", message);
     }
   });
 
-  // Handle disconnection
   socket.on("disconnect", () => {
-    console.log("A user disconnected:", socket.id);
+    console.log("User disconnected:", socket.id);
   });
 });
 
-
+// ✅ Root route
 app.get("/", (req, res) => {
   res.status(200).send("ok");
 });
-
-//commit chnages test
